@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>BotScope — Twitter Account Analyser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+<style>
+/* ── RESET ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:          #f7f8fa;
+  --bg2:         #eef0f4;
+  --surface:     #ffffff;
+  --surface2:    #f2f4f8;
+  --border:      #e2e6ed;
+  --border2:     #d0d6e0;
+  --accent:      #1a56db;
+  --accent-light:#e8f0fe;
+  --accent2:     #0d3b9c;
+  --human:       #059669;
+  --human-bg:    #ecfdf5;
+  --human-border:#a7f3d0;
+  --bot:         #dc2626;
+  --bot-bg:      #fef2f2;
+  --bot-border:  #fca5a5;
+  --warn:        #d97706;
+  --warn-bg:     #fffbeb;
+  --text:        #111827;
+  --text2:       #374151;
+  --muted:       #6b7280;
+  --muted2:      #9ca3af;
+  --mono:        'DM Mono', monospace;
+  --display:     'Plus Jakarta Sans', sans-serif;
+  --body:        'Plus Jakarta Sans', sans-serif;
+  --radius:      10px;
+  --shadow:      0 1px 4px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.05);
+  --shadow-lg:   0 4px 24px rgba(0,0,0,0.1), 0 1px 6px rgba(0,0,0,0.06);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 14.5px;
+  line-height: 1.65;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "kern" 1, "liga" 1;
+}
+
+/* ── ARCHITECTURE DRAWER ───────────────────────────────────────────── */
+#archDrawer {
+  position: fixed;
+  left: 0; top: 0; bottom: 0;
+  width: 380px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  z-index: 500;
+  transform: translateX(-100%);
+  transition: transform 0.38s cubic-bezier(0.16,1,0.3,1);
+  overflow-y: auto;
+  box-shadow: 4px 0 32px rgba(0,0,0,0.12);
+}
+#archDrawer.open { transform: translateX(0); }
+
+.drawer-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.2);
+  z-index: 499; opacity: 0; pointer-events: none;
+  transition: opacity 0.3s;
+}
+.drawer-overlay.visible { opacity: 1; pointer-events: all; }
+
+.drawer-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--surface); z-index: 2;
+}
+
+.drawer-title {
+  font-family: var(--display);
+  font-size: 14px; font-weight: 700; color: var(--text);
+  letter-spacing: -0.02em;
+  display: flex; align-items: center; gap: 10px;
+}
+.drawer-title-icon {
+  width: 28px; height: 28px; background: var(--accent-light);
+  border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px;
+}
+.drawer-close {
+  width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 6px;
+  background: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  font-size: 16px; color: var(--muted); transition: all 0.15s;
+}
+.drawer-close:hover { background: var(--bg2); color: var(--text); }
+
+.drawer-body { padding: 24px; }
+.drawer-section { margin-bottom: 28px; }
+.drawer-section-title {
+  font-family: var(--display); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
+  margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+}
+.drawer-section-title::after { content:''; flex:1; height:1px; background:var(--border); }
+
+.arch-steps { display: flex; flex-direction: column; gap: 0; }
+.arch-step {
+  display: flex; gap: 14px; padding: 14px 0;
+  border-bottom: 1px solid var(--border); position: relative;
+}
+.arch-step:last-child { border-bottom: none; }
+.arch-step-num {
+  width: 28px; height: 28px; border-radius: 50%; background: var(--accent);
+  color: #fff; font-family: var(--display); font-size: 11px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px;
+}
+.arch-step-name { font-family: var(--display); font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; letter-spacing: -0.01em; }
+.arch-step-desc { font-size: 12px; color: var(--muted); line-height: 1.65; font-weight: 400; }
+
+.arch-step.pipeline-active .arch-step-num { background: var(--accent2); box-shadow: 0 0 0 4px var(--accent-light); animation: stepPulse 0.8s ease-in-out infinite; }
+@keyframes stepPulse { 0%,100% { box-shadow: 0 0 0 4px var(--accent-light); } 50% { box-shadow: 0 0 0 8px rgba(26,86,219,0.15); } }
+.arch-step.pipeline-done .arch-step-num { background: var(--human); }
+
+.metrics-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.metric-tile { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; text-align: center; }
+.metric-tile-val { font-family: var(--display); font-size: 20px; font-weight: 800; color: var(--accent); display: block; margin-bottom: 4px; letter-spacing: -0.03em; }
+.metric-tile-label { font-size: 11px; font-family: var(--display); font-weight: 500; color: var(--muted); line-height: 1.4; }
+
+/* ── HEADER ────────────────────────────────────────────────────────── */
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 40px; height: 60px; background: var(--surface);
+  border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 1px 0 var(--border);
+}
+.logo { font-family: var(--display); font-size: 17px; font-weight: 800; color: var(--text); letter-spacing: -0.03em; display: flex; align-items: center; gap: 10px; }
+.logo-mark { width: 30px; height: 30px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.logo-mark svg { fill: #fff; }
+.header-right { display: flex; align-items: center; gap: 12px; }
+.arch-btn { display: flex; align-items: center; gap: 7px; padding: 7px 14px; background: none; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-family: var(--display); font-size: 12px; font-weight: 500; letter-spacing: -0.01em; color: var(--muted); transition: all 0.15s; white-space: nowrap; }
+.arch-btn:hover { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
+.arch-btn-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.header-tag { font-family: var(--display); font-size: 12px; font-weight: 400; color: var(--muted2); letter-spacing: -0.01em; }
+
+/* ── MAIN LAYOUT ───────────────────────────────────────────────────── */
+main { max-width: 980px; margin: 0 auto; padding: 48px 24px 80px; }
+
+/* ── HERO ──────────────────────────────────────────────────────────── */
+.hero { text-align: center; margin-bottom: 48px; }
+.hero-eyebrow { display: inline-flex; align-items: center; gap: 7px; font-family: var(--display); font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); background: var(--accent-light); border: 1px solid rgba(26,86,219,0.2); border-radius: 20px; padding: 5px 14px; margin-bottom: 20px; }
+.hero-eyebrow-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); animation: pulse2 2s ease-in-out infinite; }
+@keyframes pulse2 { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+.hero h1 { font-family: var(--display); font-size: clamp(30px, 4.5vw, 46px); font-weight: 800; color: var(--text); letter-spacing: -0.04em; line-height: 1.08; margin-bottom: 14px; }
+.hero h1 em { font-style: normal; color: var(--accent); }
+.hero-sub { font-size: 15px; font-weight: 400; color: var(--muted); max-width: 400px; margin: 0 auto; line-height: 1.6; letter-spacing: -0.01em; }
+
+/* ── SEARCH BOX ─────────────────────────────────────────────────────── */
+.search-wrap { position: relative; margin: 28px auto 0; max-width: 540px; }
+.search-icon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--muted2); pointer-events: none; display: flex; align-items: center; }
+#searchInput { width: 100%; padding: 14px 52px 14px 46px; background: var(--surface); border: 1.5px solid var(--border2); border-radius: var(--radius); color: var(--text); font-family: var(--display); font-size: 14px; font-weight: 400; letter-spacing: -0.01em; outline: none; transition: border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow); }
+#searchInput::placeholder { color: var(--muted2); font-weight: 400; }
+#searchInput:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(26,86,219,0.1), var(--shadow); }
+.search-enter { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: var(--accent); color: #fff; border: none; border-radius: 6px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 13px; transition: background 0.15s; }
+.search-enter:hover { background: var(--accent2); }
+
+/* ── DROPDOWN ──────────────────────────────────────────────────────── */
+#dropdown { position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius); max-height: 260px; overflow-y: auto; z-index: 200; display: none; box-shadow: var(--shadow-lg); }
+#dropdown.open { display: block; animation: slideDown 0.15s ease; }
+@keyframes slideDown { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+.dd-item { padding: 10px 16px; cursor: pointer; font-family: var(--display); font-size: 13.5px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid var(--border); transition: background 0.1s; }
+.dd-item:last-child { border-bottom: none; }
+.dd-item:hover { background: var(--accent-light); }
+.dd-name { color: var(--text); font-weight: 500; letter-spacing: -0.01em; }
+.dd-uid { color: var(--muted2); font-size: 11.5px; margin-left: auto; font-family: var(--mono); }
+
+/* ── LOADING / PIPELINE ANIMATION ──────────────────────────────────── */
+#loadingState { display: none; padding: 48px 0; animation: fadeUp 0.3s ease; }
+#loadingState.visible { display: block; }
+.pipeline-anim { max-width: 640px; margin: 0 auto; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 32px; box-shadow: var(--shadow); }
+.pipeline-title { font-family: var(--display); font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 4px; display: flex; align-items: center; gap: 8px; letter-spacing: -0.02em; }
+.pipeline-subtitle { font-size: 13px; font-weight: 400; color: var(--muted); margin-bottom: 28px; letter-spacing: -0.01em; }
+.pipeline-spinner { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: inline-block; animation: pulse2 1s ease-in-out infinite; }
+.pipe-stages { display: flex; flex-direction: column; gap: 0; }
+.pipe-stage { display: flex; align-items: flex-start; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--border); opacity: 0.35; transition: opacity 0.3s, transform 0.3s; }
+.pipe-stage:last-child { border-bottom: none; }
+.pipe-stage.active { opacity: 1; transform: translateX(4px); }
+.pipe-stage.done { opacity: 0.7; }
+.pipe-stage-icon { width: 36px; height: 36px; border-radius: 8px; background: var(--bg2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; transition: background 0.3s, border-color 0.3s; }
+.pipe-stage.active .pipe-stage-icon { background: var(--accent-light); border-color: var(--accent); }
+.pipe-stage.done .pipe-stage-icon { background: var(--human-bg); border-color: var(--human-border); }
+.pipe-stage-name { font-family: var(--display); font-size: 13px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; }
+.pipe-stage-name .badge-running { font-family: var(--display); font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; background: var(--accent); color: #fff; padding: 2px 8px; border-radius: 20px; animation: pulse2 1s ease-in-out infinite; }
+.pipe-stage-name .badge-done { font-family: var(--display); font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; background: var(--human-bg); color: var(--human); border: 1px solid var(--human-border); padding: 2px 8px; border-radius: 20px; }
+.pipe-stage-detail { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+/* ── RESULT PANEL ───────────────────────────────────────────────────── */
+#resultPanel { display: none; animation: fadeUp 0.4s ease; }
+#resultPanel.visible { display: block; }
+@keyframes fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+
+/* ── VERDICT BAND ───────────────────────────────────────────────────── */
+.verdict-band { border-radius: 14px; overflow: hidden; margin-bottom: 24px; border: 1.5px solid var(--border); box-shadow: var(--shadow); }
+.verdict-top { padding: 24px 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--border); }
+.verdict-top.human { background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%); border-color: var(--human-border); }
+.verdict-top.bot   { background: linear-gradient(135deg, #fef2f2 0%, #fff5f5 100%); border-color: var(--bot-border); }
+.verdict-left { display: flex; align-items: center; gap: 16px; }
+.verdict-avatar { width: 48px; height: 48px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+.verdict-avatar.human { background: var(--human-bg); }
+.verdict-avatar.bot   { background: var(--bot-bg); }
+.verdict-user-label { font-family: var(--display); font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+.verdict-user-name { font-family: var(--display); font-size: 20px; font-weight: 800; color: var(--text); letter-spacing: -0.03em; line-height: 1.15; }
+.verdict-user-id { font-family: var(--mono); font-size: 11px; font-weight: 300; color: var(--muted); margin-top: 3px; }
+.verdict-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.verdict-stamp { font-family: var(--display); font-size: 26px; font-weight: 800; letter-spacing: -0.02em; padding: 8px 20px; border-radius: 8px; text-align: center; }
+.verdict-stamp.human { color: var(--human); background: var(--human-bg); border: 1.5px solid var(--human-border); }
+.verdict-stamp.bot   { color: var(--bot);   background: var(--bot-bg);   border: 1.5px solid var(--bot-border); }
+
+/* ── TABS ──────────────────────────────────────────────────────────── */
+.tabs-wrap { display: flex; gap: 4px; margin-bottom: 20px; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 4px; width: fit-content; }
+.tab-btn { padding: 8px 18px; background: none; border: none; border-radius: 7px; color: var(--muted); font-family: var(--display); font-size: 12.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+.tab-btn:hover { color: var(--text); background: rgba(255,255,255,0.6); }
+.tab-btn.active { background: var(--surface); color: var(--accent); box-shadow: var(--shadow); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; animation: fadeUp 0.25s ease; }
+
+/* ── RAW FEATURES GRID ─────────────────────────────────────────────── */
+.features-intro { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.features-intro-title { font-family: var(--display); font-size: 15px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
+.features-intro-sub { font-size: 13px; color: var(--muted); margin-top: 2px; font-weight: 400; }
+.feat-section-label { font-family: var(--display); font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; margin-top: 20px; display: flex; align-items: center; gap: 8px; }
+.feat-section-label::after { content:''; flex:1; height:1px; background:var(--border); }
+.feat-section-label:first-child { margin-top: 0; }
+.feat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-bottom: 6px; }
+.feat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; transition: border-color 0.15s, box-shadow 0.15s; animation: featIn 0.35s ease both; }
+.feat-card:hover { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(26,86,219,0.06); }
+@keyframes featIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+.feat-card-label { font-family: var(--mono); font-size: 10px; font-weight: 400; color: var(--muted); margin-bottom: 6px; letter-spacing: 0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.feat-card-value { font-family: var(--display); font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
+.feat-card-value.bool-true  { color: var(--human); }
+.feat-card-value.bool-false { color: var(--bot); }
+
+/* ── ANALYSIS LAYOUT ─────────────────────────────────────────────── */
+.analysis-layout { display: grid; grid-template-columns: 1fr 260px; gap: 20px; align-items: start; }
+.pipeline-sidebar { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; box-shadow: var(--shadow); position: sticky; top: 80px; }
+.pipeline-sidebar-title { font-family: var(--display); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.pipeline-sidebar-title::after { content:''; flex:1; height:1px; background:var(--border); }
+.sidebar-steps { display: flex; flex-direction: column; gap: 1px; }
+.sidebar-step { display: flex; align-items: flex-start; gap: 12px; padding: 11px 10px; border-radius: 8px; transition: background 0.2s; cursor: default; }
+.sidebar-step.ss-done { background: var(--human-bg); }
+.sidebar-step.ss-active { background: var(--accent-light); }
+.ss-num { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border2); background: var(--bg2); font-family: var(--display); font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--muted); }
+.sidebar-step.ss-done .ss-num { background: var(--human); border-color: var(--human); color: #fff; }
+.sidebar-step.ss-active .ss-num { background: var(--accent); border-color: var(--accent); color: #fff; }
+.ss-name { font-family: var(--display); font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+.ss-detail { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+/* ── LLM TAB ──────────────────────────────────────────────────────── */
+.llm-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+.llm-card-header { display: flex; align-items: center; gap: 12px; padding: 18px 24px; background: var(--bg2); border-bottom: 1px solid var(--border); }
+.llm-model-badge { display: flex; align-items: center; gap: 6px; font-family: var(--display); font-size: 11.5px; font-weight: 500; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; margin-left: auto; letter-spacing: -0.01em; }
+.llm-model-badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--human); animation: pulse2 2s infinite; }
+.llm-card-title { font-family: var(--display); font-size: 14px; font-weight: 700; color: var(--text); }
+.llm-card-body { padding: 24px 28px 28px; }
+
+/* LLM bullet points */
+.llm-bullets { display: flex; flex-direction: column; gap: 14px; }
+.llm-bullet {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 14px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 14.5px;
+  line-height: 1.75;
+  color: var(--text2);
+  letter-spacing: -0.01em;
+  animation: featIn 0.35s ease both;
+}
+.llm-bullet:nth-child(1) { animation-delay: 0ms; }
+.llm-bullet:nth-child(2) { animation-delay: 60ms; }
+.llm-bullet:nth-child(3) { animation-delay: 120ms; }
+.llm-bullet:nth-child(4) { animation-delay: 180ms; }
+
+.llm-bullet-num {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--accent-light);
+  border: 1px solid rgba(26,86,219,0.2);
+  color: var(--accent);
+  font-family: var(--display);
+  font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-top: 2px;
+}
+.llm-bullet strong { font-weight: 700; color: var(--text); }
+.llm-bullet p { margin: 0; }
+
+/* fallback plain text */
+#llmText { font-size: 15px; line-height: 1.85; color: var(--text2); font-weight: 400; position: relative; letter-spacing: -0.01em; }
+
+/* ── LIME BAR CHART ───────────────────────────────────────────────── */
+.lime-header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.lime-title { font-family: var(--display); font-size: 15px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
+.lime-subtitle { font-size: 12.5px; color: var(--muted); margin-top: 2px; font-weight: 400; }
+.lime-legend { display: flex; gap: 12px; align-items: center; }
+.lime-legend-item { display: flex; align-items: center; gap: 5px; font-family: var(--display); font-size: 11.5px; font-weight: 500; color: var(--muted); }
+.lime-legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+/* Bar chart container */
+.lime-chart-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  padding: 20px 24px;
+}
+
+.lime-bar-row {
+  display: grid;
+  grid-template-columns: 220px 1fr 70px;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  animation: featIn 0.3s ease both;
+}
+.lime-bar-row:last-child { border-bottom: none; }
+
+.lime-feat-label {
+  font-family: var(--display);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text2);
+  line-height: 1.35;
+  text-align: right;
+  padding-right: 4px;
+}
+.lime-feat-condition {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 400;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+.lime-bar-track {
+  height: 22px;
+  border-radius: 4px;
+  display: flex;
+  position: relative;
+}
+
+/* Left half: bot bars grow from right edge toward left */
+.lime-bar-half {
+  width: 50%;
+  height: 100%;
+  background: var(--bg2);
+  overflow: hidden;
+  display: flex;
+  position: relative;
+}
+.lime-bar-half.left  { border-radius: 4px 0 0 4px; justify-content: flex-end; }
+.lime-bar-half.right { border-radius: 0 4px 4px 0; justify-content: flex-start; }
+
+.lime-bar-fill {
+  height: 100%;
+  width: 0%;
+  transition: width 0.7s cubic-bezier(0.16,1,0.3,1);
+  flex-shrink: 0;
+}
+.lime-bar-fill.human {
+  background: linear-gradient(90deg, #059669, #10b981);
+  border-radius: 0 4px 4px 0;
+}
+.lime-bar-fill.bot {
+  background: linear-gradient(270deg, #ef4444, #dc2626);
+  border-radius: 4px 0 0 4px;
+}
+
+/* centre line */
+.lime-bar-track::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0; bottom: 0;
+  width: 1.5px;
+  background: var(--border2);
+  transform: translateX(-50%);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.lime-weight-val {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+  text-align: right;
+  white-space: nowrap;
+}
+.lime-weight-val.human { color: var(--human); }
+.lime-weight-val.bot   { color: var(--bot); }
+
+.lime-dir-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 20px;
+  font-family: var(--display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  margin-left: 4px;
+}
+.lime-dir-badge.human { background: var(--human-bg); color: var(--human); border: 1px solid var(--human-border); }
+.lime-dir-badge.bot   { background: var(--bot-bg);   color: var(--bot);   border: 1px solid var(--bot-border); }
+
+/* chart axis label */
+.lime-axis-row {
+  display: grid;
+  grid-template-columns: 220px 1fr 70px;
+  gap: 12px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.lime-axis-labels {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--display);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.lime-axis-bot   { color: var(--bot); }
+.lime-axis-human { color: var(--human); }
+.lime-axis-center { color: var(--muted); font-size: 10px; }
+
+/* ── ERROR ──────────────────────────────────────────────────────────── */
+.error-box { background: var(--bot-bg); border: 1px solid var(--bot-border); border-radius: 8px; padding: 14px 18px; font-family: var(--display); font-size: 13px; font-weight: 500; color: var(--bot); display: none; margin-bottom: 20px; letter-spacing: -0.01em; }
+.error-box.visible { display: flex; align-items: center; gap: 8px; }
+
+/* ── SCROLLBAR ──────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg2); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted2); }
+
+/* ── FOOTER NOTE ─────────────────────────────────────────────────────── */
+.footer-note { text-align: center; font-family: var(--display); font-size: 12px; font-weight: 400; color: var(--muted2); margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--border); letter-spacing: -0.01em; }
+
+/* responsive */
+@media (max-width: 720px) {
+  .analysis-layout { grid-template-columns: 1fr; }
+  .pipeline-sidebar { position: static; }
+  header { padding: 0 16px; }
+  main { padding: 28px 16px 60px; }
+  .verdict-top { flex-direction: column; align-items: flex-start; }
+  .verdict-right { align-items: flex-start; }
+  .metrics-row { grid-template-columns: 1fr 1fr; }
+  .lime-bar-row { grid-template-columns: 140px 1fr 60px; }
+  .lime-axis-row { grid-template-columns: 140px 1fr 60px; }
+  .lime-feat-label { font-size: 11px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── ARCHITECTURE DRAWER ────────────────────────────────────────── -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeArch()"></div>
+<div id="archDrawer">
+  <div class="drawer-header">
+    <div class="drawer-title">
+      <div class="drawer-title-icon">🏗</div>
+      System Architecture
+    </div>
+    <button class="drawer-close" onclick="closeArch()">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="drawer-section">
+      <div class="drawer-section-title">Classification Pipeline</div>
+      <div class="arch-steps" id="archSteps">
+        <div class="arch-step" id="as1">
+          <div class="arch-step-num">1</div>
+          <div class="arch-step-content">
+            <div class="arch-step-name">Raw Feature Ingestion</div>
+            <div class="arch-step-desc">30+ profile & behaviour signals loaded from API dataset: follower counts, tweet metrics, engagement ratios, profile completeness flags.</div>
+          </div>
+        </div>
+        <div class="arch-step" id="as2">
+          <div class="arch-step-num">2</div>
+          <div class="arch-step-content">
+            <div class="arch-step-name">Feature Engineering</div>
+            <div class="arch-step-desc">Derived signals computed: tweets/day, followers/day, spike scores, log-transforms, young account & popularity flags, activity scores.</div>
+          </div>
+        </div>
+        <div class="arch-step" id="as3">
+          <div class="arch-step-num">3</div>
+          <div class="arch-step-content">
+            <div class="arch-step-name">Scaling & Normalisation</div>
+            <div class="arch-step-desc">RobustScaler applied to tabular features; MinMax normalisation on account age. Handles outliers gracefully without distortion.</div>
+          </div>
+        </div>
+        <div class="arch-step" id="as4">
+          <div class="arch-step-num">4</div>
+          <div class="arch-step-content">
+            <div class="arch-step-name">Graph Embedding Lookup</div>
+            <div class="arch-step-desc">k-NN (k=10, cosine) finds similar training accounts; their 64-d node embeddings are averaged and L2-normalised to form a graph context vector.</div>
+          </div>
+        </div>
+        <div class="arch-step" id="as5">
+          <div class="arch-step-num">5</div>
+          <div class="arch-step-content">
+            <div class="arch-step-name">Random Forest Classifier</div>
+            <div class="arch-step-desc">Full feature vector passed to trained Random Forest.</div>
+          </div>
+        </div>
+        <div class="arch-step" id="as6">
+          <div class="arch-step-num">6</div>
+          <div class="arch-step-content">
+            <div class="arch-step-name">LIME Explainability</div>
+            <div class="arch-step-desc">Local surrogate model (300 perturbation samples) identifies the 15 features most responsible for this specific prediction.</div>
+          </div>
+        </div>
+        <div class="arch-step" id="as7">
+          <div class="arch-step-num">7</div>
+          <div class="arch-step-content">
+            <div class="arch-step-name">LLM Narrative</div>
+            <div class="arch-step-desc">Top LIME evidence translated into a plain-English analyst summary by a language model via OpenRouter API.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <div class="drawer-section-title">Model Performance</div>
+      <div class="metrics-row">
+        <div class="metric-tile"><span class="metric-tile-val">~95%</span><div class="metric-tile-label">Accuracy</div></div>
+        <div class="metric-tile"><span class="metric-tile-val">64-d</span><div class="metric-tile-label">Graph Embeddings</div></div>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <div class="drawer-section-title">Key Bot Signals</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="font-size:13px;color:var(--text2);padding:10px 12px;background:var(--bg2);border-radius:8px;border-left:3px solid var(--bot);"><strong style="font-family:var(--display);font-size:12px;">Follower Spikes</strong><br><span style="color:var(--muted);font-size:12px;">High follower count relative to account age</span></div>
+        <div style="font-size:13px;color:var(--text2);padding:10px 12px;background:var(--bg2);border-radius:8px;border-left:3px solid var(--bot);"><strong style="font-family:var(--display);font-size:12px;">Low Engagement Diversity</strong><br><span style="color:var(--muted);font-size:12px;">Heavy posting with little genuine interaction</span></div>
+        <div style="font-size:13px;color:var(--text2);padding:10px 12px;background:var(--bg2);border-radius:8px;border-left:3px solid var(--bot);"><strong style="font-family:var(--display);font-size:12px;">Hashtag Overuse</strong><br><span style="color:var(--muted);font-size:12px;">Abnormally high avg hashtags per tweet</span></div>
+        <div style="font-size:13px;color:var(--text2);padding:10px 12px;background:var(--bg2);border-radius:8px;border-left:3px solid var(--warn);"><strong style="font-family:var(--display);font-size:12px;">Mention Patterns</strong><br><span style="color:var(--muted);font-size:12px;">Atypical mention frequency relative to activity</span></div>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <div class="drawer-section-title">Interpreting LIME</div>
+      <p style="font-size:13px;color:var(--muted);line-height:1.7;">LIME perturbs input features and measures prediction change. Bars extending right (green) push toward HUMAN; bars extending left (red) push toward BOT. Bar length shows relative influence — the longer the bar, the stronger that signal's effect on this specific prediction.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ── HEADER ────────────────────────────────────────────────────── -->
+<header>
+  <div class="logo">
+    <div class="logo-mark">
+      <svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5"/><circle cx="8" cy="8" r="2.5" fill="rgba(255,255,255,0.5)"/></svg>
+    </div>
+    BotScope
+  </div>
+  <div class="header-right">
+    <div class="header-tag">Twitter Account Intelligence</div>
+    <button class="arch-btn" onclick="openArch()">
+      <div class="arch-btn-dot"></div>
+      Architecture &amp; Model Info
+    </button>
+  </div>
+</header>
+
+<main>
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-eyebrow">
+      <div class="hero-eyebrow-dot"></div>
+      ML-Powered · LIME Explainability · LLM Summaries
+    </div>
+    <h1>Detect. Analyse. <em>Explain.</em></h1>
+    <p class="hero-sub">Search a Twitter account to run the full bot detection pipeline with live explainability.</p>
+
+    <div class="search-wrap">
+      <span class="search-icon">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      </span>
+      <input id="searchInput" type="text" placeholder="Search by username or user ID…" autocomplete="off" spellcheck="false"/>
+      <button class="search-enter" onclick="triggerSearch()">↵</button>
+      <div id="dropdown"></div>
+    </div>
+  </div>
+
+  <!-- ERROR -->
+  <div class="error-box" id="errorBox">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <span id="errorMsg"></span>
+  </div>
+
+  <!-- LOADING / PIPELINE ANIMATION -->
+  <div id="loadingState">
+    <div class="pipeline-anim">
+      <div class="pipeline-title">
+        <div class="pipeline-spinner"></div>
+        Running Analysis Pipeline
+      </div>
+      <div class="pipeline-subtitle" id="pipelineSubtitle">Fetching account data…</div>
+      <div class="pipe-stages" id="pipeStages">
+        <div class="pipe-stage" id="ps1"><div class="pipe-stage-icon">📥</div><div class="pipe-stage-body"><div class="pipe-stage-name">Feature Ingestion</div><div class="pipe-stage-detail">Loading raw account features from dataset</div></div></div>
+        <div class="pipe-stage" id="ps2"><div class="pipe-stage-icon">⚙️</div><div class="pipe-stage-body"><div class="pipe-stage-name">Feature Engineering & Scaling</div><div class="pipe-stage-detail">Computing derived signals, applying RobustScaler</div></div></div>
+        <div class="pipe-stage" id="ps3"><div class="pipe-stage-icon">🔍</div><div class="pipe-stage-body"><div class="pipe-stage-name">Graph Embedding Lookup</div><div class="pipe-stage-detail">k-NN search → averaging neighbour embeddings</div></div></div>
+        <div class="pipe-stage" id="ps4"><div class="pipe-stage-icon">🌲</div><div class="pipe-stage-body"><div class="pipe-stage-name">Random Forest Classification</div><div class="pipe-stage-detail">Computing P(Human) with trained classifier</div></div></div>
+        <div class="pipe-stage" id="ps5"><div class="pipe-stage-icon">🧪</div><div class="pipe-stage-body"><div class="pipe-stage-name">LIME Explanation</div><div class="pipe-stage-detail">Generating 300-sample local feature attributions</div></div></div>
+        <div class="pipe-stage" id="ps6"><div class="pipe-stage-icon">✍️</div><div class="pipe-stage-body"><div class="pipe-stage-name">LLM Narrative Generation</div><div class="pipe-stage-detail">Translating evidence into plain-English summary</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULT PANEL -->
+  <div id="resultPanel">
+    <!-- VERDICT BAND -->
+    <div class="verdict-band" id="verdictBand">
+      <div class="verdict-top" id="verdictTop">
+        <div class="verdict-left">
+          <div class="verdict-avatar" id="verdictAvatar">👤</div>
+          <div>
+            <div class="verdict-user-label">Account</div>
+            <div class="verdict-user-name" id="vName">—</div>
+            <div class="verdict-user-id" id="vId">—</div>
+          </div>
+        </div>
+        <div class="verdict-right">
+          <div class="verdict-stamp" id="vStamp">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB BAR -->
+    <div class="tabs-wrap">
+      <button class="tab-btn active" onclick="switchTab('features', this)">Raw Features</button>
+      <button class="tab-btn" onclick="switchTab('analysis', this)">LLM Analysis</button>
+      <button class="tab-btn" onclick="switchTab('lime', this)">LIME Evidence</button>
+    </div>
+
+    <!-- TAB: RAW FEATURES + PIPELINE SIDEBAR -->
+    <div class="tab-panel active" id="tab-features">
+      <div class="analysis-layout">
+        <div>
+          <div class="features-intro">
+            <div>
+              <div class="features-intro-title">Raw Account Features</div>
+              <div class="features-intro-sub">All input signals used by the model</div>
+            </div>
+          </div>
+          <div class="feat-section-label">Profile Basics</div>
+          <div class="feat-grid" id="featGrid-profile"></div>
+          <div class="feat-section-label">Engagement & Activity</div>
+          <div class="feat-grid" id="featGrid-engagement"></div>
+          <div class="feat-section-label">Content & Language</div>
+          <div class="feat-grid" id="featGrid-content"></div>
+          <div class="feat-section-label">Boolean Flags</div>
+          <div class="feat-grid" id="featGrid-flags"></div>
+        </div>
+
+        <!-- PIPELINE SIDEBAR -->
+        <div class="pipeline-sidebar">
+          <div class="pipeline-sidebar-title">Processing Pipeline</div>
+          <div class="sidebar-steps">
+            <div class="sidebar-step ss-done"><div class="ss-num">✓</div><div class="ss-body"><div class="ss-name">Feature Ingestion</div><div class="ss-detail">Raw signals loaded</div></div></div>
+            <div class="sidebar-step ss-done"><div class="ss-num">✓</div><div class="ss-body"><div class="ss-name">Feature Engineering</div><div class="ss-detail">Derived metrics computed</div></div></div>
+            <div class="sidebar-step ss-done"><div class="ss-num">✓</div><div class="ss-body"><div class="ss-name">RobustScaler</div><div class="ss-detail">Outlier-resistant normalisation</div></div></div>
+            <div class="sidebar-step ss-done"><div class="ss-num">✓</div><div class="ss-body"><div class="ss-name">Graph Embedding</div><div class="ss-detail">k-NN lookup + averaging</div></div></div>
+            <div class="sidebar-step ss-done"><div class="ss-num">✓</div><div class="ss-body"><div class="ss-name">Random Forest</div><div class="ss-detail">Classification complete</div></div></div>
+            <div class="sidebar-step ss-done"><div class="ss-num">✓</div><div class="ss-body"><div class="ss-name">LIME + LLM</div><div class="ss-detail">Explanations generated</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: LLM ANALYSIS -->
+    <div class="tab-panel" id="tab-analysis">
+      <div class="llm-card">
+        <div class="llm-card-header">
+          <div class="llm-card-title">AI Analyst Summary</div>
+          <div class="llm-model-badge">
+            <div class="llm-model-badge-dot"></div>
+            LLM Generated
+          </div>
+        </div>
+        <div class="llm-card-body">
+          <div class="llm-bullets" id="llmBullets"></div>
+          <!-- fallback for non-bulleted responses -->
+          <p id="llmText" style="display:none;"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: LIME EVIDENCE (bar chart) -->
+    <div class="tab-panel" id="tab-lime">
+      <div class="lime-header-row">
+        <div>
+          <div class="lime-title">LIME Feature Attributions</div>
+          <div class="lime-subtitle">Top 15 features influencing this prediction — bars show direction and strength</div>
+        </div>
+        <div class="lime-legend">
+          <div class="lime-legend-item"><div class="lime-legend-dot" style="background:var(--human)"></div>Human signal</div>
+          <div class="lime-legend-item"><div class="lime-legend-dot" style="background:var(--bot)"></div>Bot signal</div>
+        </div>
+      </div>
+
+      <div class="lime-chart-wrap">
+        <!-- axis header -->
+        <div class="lime-axis-row">
+          <div></div>
+          <div class="lime-axis-labels">
+            <span class="lime-axis-bot">← Bot</span>
+            <span class="lime-axis-center">Neutral</span>
+            <span class="lime-axis-human">Human →</span>
+          </div>
+          <div></div>
+        </div>
+        <div id="limeBarChart"></div>
+      </div>
+    </div>
+
+  </div><!-- end resultPanel -->
+
+  <div class="footer-note">BotScope · Random Forest + LIME</div>
+</main>
+
+<script>
+const API = 'http://localhost:5000/api';
+let allUsers = [];
+let currentData = null;
+
+// ── HUMAN-READABLE FEATURE NAMES ─────────────────────────────────────
+// Maps raw feature key prefixes → { label, description }
+const FEAT_NAMES = {
+  followers_count:        { label: 'Follower Count',               desc: 'Total number of followers' },
+  friends_count:          { label: 'Following Count',              desc: 'Number of accounts followed' },
+  tweets_count:           { label: 'Total Tweets',                 desc: 'Total tweets ever posted' },
+  listed_count:           { label: 'List Appearances',             desc: 'Times added to curated lists' },
+  hashtag_count:          { label: 'Total Hashtags Used',          desc: 'Sum of hashtags across all tweets' },
+  mentions_count:         { label: 'Total Mentions Made',          desc: 'Total times this account mentioned others' },
+  retweet_count:          { label: 'Total Retweets Received',      desc: 'How often tweets were retweeted' },
+  reply_count:            { label: 'Total Replies Received',       desc: 'How often tweets received replies' },
+  url_count:              { label: 'Total URLs Shared',            desc: 'Number of links posted' },
+  ff_ratio:               { label: 'Followers-to-Following Ratio', desc: 'Followers ÷ following (higher = more influential)' },
+  avg_hashtag:            { label: 'Avg Hashtags per Tweet',       desc: 'Average number of hashtags per tweet' },
+  avg_mentions:           { label: 'Avg Mentions per Tweet',       desc: 'Average mentions per tweet' },
+  avg_retweet:            { label: 'Avg Retweets per Tweet',       desc: 'Average retweets each tweet receives' },
+  avg_reply:              { label: 'Avg Replies per Tweet',        desc: 'Average replies each tweet receives' },
+  avg_url:                { label: 'Avg URLs per Tweet',           desc: 'Average links per tweet' },
+  avg_user_engagement:    { label: 'Avg Engagement Score',         desc: 'Overall average engagement per tweet' },
+  has_description:        { label: 'Has Bio',                      desc: 'Account has a bio / description' },
+  has_prof_url:           { label: 'Has Profile URL',              desc: 'Account has a website link in profile' },
+  has_location:           { label: 'Has Location',                 desc: 'Account has a location set' },
+  has_prof_img:           { label: 'Has Profile Photo',            desc: 'Account has a profile picture' },
+  profile_completeness:   { label: 'Profile Completeness',         desc: 'How complete the profile is (0–1)' },
+  avg_polarity:           { label: 'Avg Sentiment Polarity',       desc: 'Average positivity/negativity of tweets' },
+  avg_subjectivity:       { label: 'Avg Subjectivity',             desc: 'How opinionated vs factual tweets are' },
+  unique_word_count:      { label: 'Unique Word Count',            desc: 'Total distinct words used across tweets' },
+  unique_word_use:        { label: 'Vocabulary Diversity',         desc: 'Ratio of unique to total words used' },
+  punctuation_count:      { label: 'Punctuation Count',            desc: 'Total punctuation marks used' },
+  avg_sentence_length:    { label: 'Avg Sentence Length',          desc: 'Average words per sentence' },
+  punctuation_density:    { label: 'Punctuation Density',          desc: 'Punctuation per word ratio' },
+  account_age_days:       { label: 'Account Age (days)',           desc: 'How old the account is in days' },
+  verified:               { label: 'Verified Account',             desc: 'Has a Twitter verification badge' },
+  tweets_per_day:         { label: 'Tweets per Day',               desc: 'Average daily tweet rate' },
+  followers_per_day:      { label: 'Follower Gain per Day',        desc: 'Average new followers gained each day' },
+  followers_spike:        { label: 'Follower Spike Score',         desc: 'Followers relative to account age' },
+  tweet_spike:            { label: 'Tweet Spike Score',            desc: 'Tweets relative to account age' },
+  extreme_activity_score: { label: 'Extreme Activity Score',       desc: 'Combined follower + tweet spike measure' },
+  young_account_flag:     { label: 'New Account (< 90 days)',      desc: 'Account created less than 90 days ago' },
+  huge_followers_flag:    { label: 'Unusually High Followers',     desc: 'Follower count in top 5% of all accounts' },
+  young_and_popular:      { label: 'New & High-Follower',          desc: 'Both new account and high follower count — a red flag' },
+  log_tweets_per_day:     { label: 'Log Tweets per Day',           desc: 'Log-scaled daily tweet rate' },
+  log_followers_per_day:  { label: 'Log Follower Gain/Day',        desc: 'Log-scaled daily follower gain' },
+};
+
+// Resolve a raw LIME feature string like "ff_ratio > 0.50" into { label, condition }
+function resolveFeatName(raw) {
+  const keys = Object.keys(FEAT_NAMES).sort((a,b) => b.length - a.length); // longest first
+  for (const key of keys) {
+    if (raw === key || raw.startsWith(key + ' ') || raw.startsWith(key + '>') || raw.startsWith(key + '<') || raw.startsWith(key + '=')) {
+      const condition = raw.slice(key.length).trim().replace(/^[><=!]+\s*/, v => v + ' ').trim();
+      return { label: FEAT_NAMES[key].label, condition };
+    }
+  }
+  // fallback: capitalise snake_case
+  const parts = raw.split(/\s+/);
+  const nameRaw = parts[0];
+  const condition = parts.slice(1).join(' ');
+  const label = nameRaw.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return { label, condition };
+}
+
+// ── DRAWER ───────────────────────────────────────────────────────────
+function openArch() {
+  document.getElementById('archDrawer').classList.add('open');
+  document.getElementById('drawerOverlay').classList.add('visible');
+  document.body.style.overflow = 'hidden';
+}
+function closeArch() {
+  document.getElementById('archDrawer').classList.remove('open');
+  document.getElementById('drawerOverlay').classList.remove('visible');
+  document.body.style.overflow = '';
+}
+
+// ── LOAD USERS ───────────────────────────────────────────────────────
+async function loadUsers() {
+  try {
+    const r = await fetch(`${API}/users`);
+    allUsers = await r.json();
+  } catch(e) {
+    showError('Cannot connect to backend. Make sure app.py is running on port 5000.');
+  }
+}
+loadUsers();
+
+// ── SEARCH / DROPDOWN ────────────────────────────────────────────────
+const input    = document.getElementById('searchInput');
+const dropdown = document.getElementById('dropdown');
+
+input.addEventListener('input', () => {
+  const q = input.value.trim().toLowerCase();
+  if (!q) { dropdown.classList.remove('open'); return; }
+  const matches = allUsers.filter(u =>
+    (u.user_name && u.user_name.toLowerCase().includes(q)) || u.user_id.includes(q)
+  ).slice(0, 8);
+  if (!matches.length) { dropdown.classList.remove('open'); return; }
+  dropdown.innerHTML = matches.map(u => `
+    <div class="dd-item" onclick="selectUser('${u.user_id}','${(u.user_name||u.user_id).replace(/'/g,"\\'")}')">
+      <span class="dd-name">${u.user_name || '—'}</span>
+      <span class="dd-uid">${u.user_id}</span>
+    </div>
+  `).join('');
+  dropdown.classList.add('open');
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.search-wrap')) dropdown.classList.remove('open');
+});
+
+input.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { const q = input.value.trim(); if (q) { dropdown.classList.remove('open'); analyse(q); } }
+});
+
+function triggerSearch() {
+  const q = input.value.trim();
+  if (q) { dropdown.classList.remove('open'); analyse(q); }
+}
+
+function selectUser(uid, name) {
+  input.value = name;
+  dropdown.classList.remove('open');
+  analyse(uid);
+}
+
+// ── PIPELINE ANIMATION ───────────────────────────────────────────────
+const pipeStageData = [
+  { id: 'ps1', archId: 'as1', subtitle: 'Loading raw features from dataset…' },
+  { id: 'ps2', archId: 'as2', subtitle: 'Engineering & scaling features…' },
+  { id: 'ps3', archId: 'as3', subtitle: 'Running graph embedding lookup…' },
+  { id: 'ps4', archId: 'as4', subtitle: 'Classifying with Random Forest…' },
+  { id: 'ps5', archId: 'as5', subtitle: 'Generating LIME attributions…' },
+  { id: 'ps6', archId: 'as6', subtitle: 'Composing LLM narrative…' },
+];
+
+function setActiveStage(n) {
+  pipeStageData.forEach((s, i) => {
+    const el = document.getElementById(s.id);
+    const nameEl = el.querySelector('.pipe-stage-name');
+    nameEl.querySelectorAll('.badge-running,.badge-done').forEach(b => b.remove());
+    if (i + 1 < n) {
+      el.className = 'pipe-stage done';
+      const b = document.createElement('span'); b.className = 'badge-done'; b.textContent = 'Done'; nameEl.appendChild(b);
+    } else if (i + 1 === n) {
+      el.className = 'pipe-stage active';
+      const b = document.createElement('span'); b.className = 'badge-running'; b.textContent = 'Running'; nameEl.appendChild(b);
+      document.getElementById('pipelineSubtitle').textContent = pipeStageData[i].subtitle;
+    } else { el.className = 'pipe-stage'; }
+    const archEl = document.getElementById(s.archId);
+    if (archEl) {
+      archEl.classList.remove('pipeline-active','pipeline-done');
+      if (i + 1 < n) archEl.classList.add('pipeline-done');
+      else if (i + 1 === n) archEl.classList.add('pipeline-active');
+    }
+  });
+}
+
+function markAllStagesDone() {
+  pipeStageData.forEach((s) => {
+    const el = document.getElementById(s.id);
+    const nameEl = el.querySelector('.pipe-stage-name');
+    nameEl.querySelectorAll('.badge-running,.badge-done').forEach(b => b.remove());
+    el.className = 'pipe-stage done';
+    const b = document.createElement('span'); b.className = 'badge-done'; b.textContent = 'Done'; nameEl.appendChild(b);
+    const archEl = document.getElementById(s.archId);
+    if (archEl) { archEl.classList.remove('pipeline-active'); archEl.classList.add('pipeline-done'); }
+  });
+  document.getElementById('pipelineSubtitle').textContent = 'Analysis complete.';
+}
+
+function resetPipelineStages() {
+  pipeStageData.forEach(s => {
+    const el = document.getElementById(s.id);
+    el.className = 'pipe-stage';
+    el.querySelector('.pipe-stage-name').querySelectorAll('.badge-running,.badge-done').forEach(b => b.remove());
+    const archEl = document.getElementById(s.archId);
+    if (archEl) archEl.classList.remove('pipeline-active','pipeline-done');
+  });
+}
+
+// ── ANALYSE ──────────────────────────────────────────────────────────
+async function analyse(userId) {
+  showError('');
+  hideResult();
+  resetPipelineStages();
+  document.getElementById('loadingState').classList.add('visible');
+  document.getElementById('loadingState').style.display = 'block';
+
+  setActiveStage(1); await delay(400);
+  setActiveStage(2); await delay(350);
+  setActiveStage(3); await delay(300);
+  setActiveStage(4); await delay(500);
+  setActiveStage(5); await delay(450);
+  setActiveStage(6);
+
+  try {
+    const r    = await fetch(`${API}/analyse/${encodeURIComponent(userId)}`);
+    const data = await r.json();
+    if (data.error) {
+      showError(data.error);
+      document.getElementById('loadingState').style.display = 'none';
+      document.getElementById('loadingState').classList.remove('visible');
+      return;
+    }
+    await delay(400);
+    markAllStagesDone();
+    await delay(300);
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('loadingState').classList.remove('visible');
+    currentData = data;
+    renderResult(data);
+  } catch(e) {
+    showError('Analysis failed. Is the backend running? (' + e.message + ')');
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('loadingState').classList.remove('visible');
+  }
+}
+
+// ── RAW FEATURES DATA ────────────────────────────────────────────────
+const FEATURE_GROUPS = {
+  profile: { fields: [
+    { key: 'followers_count',   label: 'Followers',          fmt: 'num' },
+    { key: 'friends_count',     label: 'Following',          fmt: 'num' },
+    { key: 'listed_count',      label: 'List appearances',   fmt: 'num' },
+    { key: 'tweets_count',      label: 'Total tweets',       fmt: 'num' },
+    { key: 'account_age_days',  label: 'Account age (days)', fmt: 'num1' },
+    { key: 'ff_ratio',          label: 'Follower/following ratio', fmt: 'num4' },
+    { key: 'profile_completeness', label: 'Profile completeness', fmt: 'num3' },
+  ]},
+  engagement: { fields: [
+    { key: 'hashtag_count',      label: 'Total hashtags',      fmt: 'num' },
+    { key: 'mentions_count',     label: 'Total mentions',      fmt: 'num' },
+    { key: 'retweet_count',      label: 'Total retweets',      fmt: 'num' },
+    { key: 'reply_count',        label: 'Total replies',       fmt: 'num' },
+    { key: 'url_count',          label: 'Total URLs shared',   fmt: 'num' },
+    { key: 'avg_hashtag',        label: 'Avg hashtags/tweet',  fmt: 'num4' },
+    { key: 'avg_mentions',       label: 'Avg mentions/tweet',  fmt: 'num4' },
+    { key: 'avg_retweet',        label: 'Avg retweets/tweet',  fmt: 'num4' },
+    { key: 'avg_reply',          label: 'Avg replies/tweet',   fmt: 'num4' },
+    { key: 'avg_url',            label: 'Avg URLs/tweet',      fmt: 'num4' },
+    { key: 'avg_user_engagement',label: 'Avg engagement score',fmt: 'num4' },
+  ]},
+  content: { fields: [
+    { key: 'avg_polarity',         label: 'Sentiment polarity',    fmt: 'num4' },
+    { key: 'avg_subjectivity',     label: 'Subjectivity score',    fmt: 'num4' },
+    { key: 'unique_word_count',    label: 'Unique words used',     fmt: 'num' },
+    { key: 'unique_word_use',      label: 'Vocabulary diversity',  fmt: 'num4' },
+    { key: 'punctuation_count',    label: 'Punctuation count',     fmt: 'num' },
+    { key: 'avg_sentence_length',  label: 'Avg sentence length',   fmt: 'num2' },
+    { key: 'punctuation_density',  label: 'Punctuation density',   fmt: 'num4' },
+  ]},
+  flags: { fields: [
+    { key: 'verified',          label: 'Verified',          fmt: 'bool' },
+    { key: 'has_description',   label: 'Has bio',           fmt: 'bool' },
+    { key: 'has_prof_url',      label: 'Has website link',  fmt: 'bool' },
+    { key: 'has_location',      label: 'Has location',      fmt: 'bool' },
+    { key: 'has_prof_img',      label: 'Has profile photo', fmt: 'bool' },
+  ]},
+};
+
+function formatVal(v, fmt) {
+  if (v === null || v === undefined || v === '') return '—';
+  if (fmt === 'bool') return (v == 1 || v === true || v === 'True') ? 'Yes' : 'No';
+  if (fmt === 'num')  return Number(v).toLocaleString();
+  if (fmt === 'num1') return Number(v).toFixed(1);
+  if (fmt === 'num2') return Number(v).toFixed(2);
+  if (fmt === 'num3') return Number(v).toFixed(3);
+  if (fmt === 'num4') return Number(v).toFixed(4);
+  return String(v);
+}
+
+function renderFeatures(rawRow) {
+  Object.entries(FEATURE_GROUPS).forEach(([group, cfg]) => {
+    const el = document.getElementById(`featGrid-${group}`);
+    el.innerHTML = '';
+    cfg.fields.forEach((f, i) => {
+      const v  = rawRow[f.key];
+      const fv = formatVal(v, f.fmt);
+      const boolClass = f.fmt === 'bool' ? (fv === 'Yes' ? 'bool-true' : 'bool-false') : '';
+      const card = document.createElement('div');
+      card.className = 'feat-card';
+      card.style.animationDelay = `${i * 30}ms`;
+      card.innerHTML = `<div class="feat-card-label">${f.label}</div><div class="feat-card-value ${boolClass}">${fv}</div>`;
+      el.appendChild(card);
+    });
+  });
+}
+
+// ── LLM BULLET RENDERING ─────────────────────────────────────────────
+function renderBoldMarkdown(text) {
+  return text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+}
+
+function renderLLMBullets(text) {
+  const bulletsEl  = document.getElementById('llmBullets');
+  const fallbackEl = document.getElementById('llmText');
+
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const bullets = [];
+
+  for (const line of lines) {
+    const m = line.match(/^[•\-\*][\s]+(.+)/) || line.match(/^\d+[\.\)]\s+(.+)/);
+    if (m) { bullets.push(m[1]); }
+  }
+
+  if (bullets.length >= 2) {
+    bulletsEl.innerHTML = '';
+    bulletsEl.style.display = 'flex';
+    fallbackEl.style.display = 'none';
+    bullets.forEach((txt, i) => {
+      const div = document.createElement('div');
+      div.className = 'llm-bullet';
+      div.style.animationDelay = `${i * 70}ms`;
+      div.innerHTML = `
+        <div class="llm-bullet-num">${i + 1}</div>
+        <p>${renderBoldMarkdown(txt)}</p>
+      `;
+      bulletsEl.appendChild(div);
+    });
+  } else {
+    bulletsEl.style.display = 'none';
+    fallbackEl.style.display = 'block';
+    fallbackEl.innerHTML = renderBoldMarkdown(text);
+  }
+}
+
+// ── LIME BAR CHART RENDERING ─────────────────────────────────────────
+function renderLimeBarChart(features) {
+  const container = document.getElementById('limeBarChart');
+  container.innerHTML = '';
+
+  const maxW = Math.max(...features.map(f => Math.abs(f.weight)));
+
+  features.forEach((f, i) => {
+    const { label, condition } = resolveFeatName(f.feature);
+    const cls     = f.direction.toLowerCase();
+    const pct     = (Math.abs(f.weight) / maxW) * 48;
+    const sign    = f.weight > 0 ? '+' : '−';
+    const absW    = Math.abs(f.weight).toFixed(4);
+
+    const row = document.createElement('div');
+    row.className = 'lime-bar-row';
+    row.style.animationDelay = `${i * 40}ms`;
+
+    const labelCell = document.createElement('div');
+    labelCell.className = 'lime-feat-label';
+    labelCell.innerHTML = `${label}${condition ? `<span class="lime-feat-condition">${condition}</span>` : ''}`;
+
+    const trackCell = document.createElement('div');
+    trackCell.className = 'lime-bar-track';
+
+    // Left half: contains bot bar (grows rightward from right edge of left half)
+    const leftHalf = document.createElement('div');
+    leftHalf.className = 'lime-bar-half left';
+    const botFill = document.createElement('div');
+    botFill.className = 'lime-bar-fill bot';
+    botFill.style.width = '0%';
+    leftHalf.appendChild(botFill);
+
+    // Right half: contains human bar (grows leftward from left edge of right half)
+    const rightHalf = document.createElement('div');
+    rightHalf.className = 'lime-bar-half right';
+    const humanFill = document.createElement('div');
+    humanFill.className = 'lime-bar-fill human';
+    humanFill.style.width = '0%';
+    rightHalf.appendChild(humanFill);
+
+    trackCell.appendChild(leftHalf);
+    trackCell.appendChild(rightHalf);
+
+    // Animate only the relevant half
+    setTimeout(() => {
+      if (cls === 'bot')   { botFill.style.width   = `${pct}%`; }
+      else                 { humanFill.style.width  = `${pct}%`; }
+    }, 60 + i * 30);
+
+    const valCell = document.createElement('div');
+    valCell.className = `lime-weight-val ${cls}`;
+    valCell.innerHTML = `${sign}${absW} <span class="lime-dir-badge ${cls}">${f.direction}</span>`;
+
+    row.appendChild(labelCell);
+    row.appendChild(trackCell);
+    row.appendChild(valCell);
+    container.appendChild(row);
+  });
+}
+
+// ── RENDER RESULT ────────────────────────────────────────────────────
+function renderResult(d) {
+  const cls   = d.prediction === 'HUMAN' ? 'human' : 'bot';
+  const emoji = d.prediction === 'HUMAN' ? '👤' : '🤖';
+
+  document.getElementById('verdictTop').className   = `verdict-top ${cls}`;
+  document.getElementById('verdictAvatar').className = `verdict-avatar ${cls}`;
+  document.getElementById('verdictAvatar').textContent = emoji;
+  document.getElementById('vName').textContent = d.user_name || d.user_id;
+  document.getElementById('vId').textContent   = `ID: ${d.user_id}`;
+  const stamp = document.getElementById('vStamp');
+  stamp.textContent = d.prediction;
+  stamp.className   = `verdict-stamp ${cls}`;
+
+  renderLLMBullets(d.llm_explanation || '—');
+  renderLimeBarChart(d.lime_features || []);
+  renderFeatures(d.raw_features || {});
+
+  switchTab('features', document.querySelector('.tab-btn'));
+  document.getElementById('resultPanel').classList.add('visible');
+  document.getElementById('resultPanel').style.display = 'block';
+}
+
+// ── TAB SWITCHING ────────────────────────────────────────────────────
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  else document.querySelector(`.tab-btn[onclick*="${name}"]`)?.classList.add('active');
+  document.getElementById(`tab-${name}`).classList.add('active');
+}
+
+// ── UI HELPERS ───────────────────────────────────────────────────────
+function hideResult() {
+  const rp = document.getElementById('resultPanel');
+  rp.classList.remove('visible');
+  rp.style.display = 'none';
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorBox');
+  if (msg) { document.getElementById('errorMsg').textContent = msg; el.classList.add('visible'); }
+  else      { el.classList.remove('visible'); }
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+</script>
+</body>
+</html>
