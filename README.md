@@ -34,6 +34,7 @@ Twitter_Bot_detection/
 ├── Trained_Models/               # Saved model artifacts
 ├── Documents/                   # Project documentation
 ├── literature survey papers/    # Reference papers
+├── Demo video/                  # Demo video of this project
 └── Requirement.txt.txt          # Python dependencies
 ```
 
